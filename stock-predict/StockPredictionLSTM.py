@@ -14,6 +14,7 @@ from keras.layers import Conv1D, MaxPooling1D, Embedding
 from keras.models import Model
 import pandas as pd
 from keras.layers.recurrent import LSTM
+import pickle
 
 def retainAlpha(word):
     for s in word:
@@ -119,4 +120,31 @@ model.compile(optimizer='rmsprop',
               loss='binary_crossentropy',
               metrics=['accuracy'])
 model.fit(merged_padded_data_train, train_labels, epochs=10)
+
+#Saving the Model to disk.
+model_json = model.to_json()
+with open("model.json", "w") as json_file:
+    json_file.write(model_json)
+# serialize weights to HDF5
+model.save_weights("model.h5")
+print("Saved model to disk")
+
+# Evaluate Model performance
+model.evaluate(x=merged_padded_data_test, y=test_labels)
+
+# Testing the model
+pred_labels = model.predict(merged_padded_data_test, verbose=1)
+pred_series = pd.Series(pred_labels)
+test["pred_labels"] = pred_series.values
+test.to_csv("test-results.csv")
+
+# Loading model from disk
+# json_file = open('model.json', 'r')
+# loaded_model_json = json_file.read()
+# json_file.close()
+# loaded_model = model_from_json(loaded_model_json)
+# # load weights into new model
+# loaded_model.load_weights("model.h5")
+# print("Loaded model from disk")
+
 
