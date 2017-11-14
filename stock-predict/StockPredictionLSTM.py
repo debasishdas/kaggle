@@ -14,6 +14,7 @@ from keras.models import Model
 import pandas as pd
 from keras.layers.recurrent import LSTM
 import pickle
+import itertools
 
 def retainAlpha(word):
     for s in word:
@@ -28,7 +29,7 @@ MAX_SEQUENCE_LENGTH = 1000
 MAX_NB_WORDS = 5000
 EMBEDDING_DIM = 100
 VALIDATION_SPLIT = 0.2
-NBR_OF_HDLNS = 15
+NBR_OF_HDLNS = 25
 
 # first, build index mapping words in the embeddings set
 # to their embedding vector
@@ -54,7 +55,6 @@ test = data[data['Date'] > '2014-12-31']
 train_labels = train["Label"].tolist()
 test_labels = test["Label"].tolist()
 
-tokenizers = {}
 all_train_sequences = {}
 all_test_sequences = {}
 
@@ -64,9 +64,11 @@ for index in range(1, 26):
                        for headline in train[hdr].tolist()]
     test_headlines = [' '.join(text_to_word_sequence(str(headline) if type(headline) != 'str' else headline)[1:])
                       for headline in test[hdr].tolist()]
-    tokenizer = Tokenizer(num_words=MAX_NB_WORDS)
-    tokenizer.fit_on_texts(train_headlines)
-    tokenizers[index] = tokenizer
+
+tokenizer = Tokenizer(num_words=MAX_NB_WORDS)
+tokenizer.fit_on_texts(list(itertools.chain(*train_headlines)))
+
+for index in range(1, 26):
     all_train_sequences[index] = tokenizer.texts_to_sequences(train_headlines)
     all_test_sequences[index] = tokenizer.texts_to_sequences(test_headlines)
 
@@ -76,36 +78,37 @@ merged_input = []
 merged_padded_data_train = []
 merged_padded_data_test = []
 
+word_index = tokenizer.word_index
+print('Found %s unique tokens.' % len(word_index))
+print('Max index value in word_index = %s' % max(word_index.values()))
+print('Min index value in word_index = %s' % min(word_index.values()))
+num_words = min(MAX_NB_WORDS, len(word_index))
+embedding_matrix = np.zeros((num_words, EMBEDDING_DIM))
+print("Embedding Matrix dimensions = " + str(embedding_matrix.shape[0]) + "," + str(embedding_matrix.shape[1]))
+for word, i in word_index.items():
+    if i >= MAX_NB_WORDS:
+        continue
+    embedding_vector = embeddings_index.get(word)
+    if embedding_vector is not None:
+        # words not found in embedding index will be all-zeros.
+        embedding_matrix[i] = embedding_vector
+
+# load pre-trained word embeddings into an Embedding layer
+# note that we set trainable = False so as to keep the embeddings fixed
+embedding_layer = Embedding(num_words,
+                            EMBEDDING_DIM,
+                            weights=[embedding_matrix],
+                            input_length=MAX_SEQUENCE_LENGTH,
+                            trainable=False)
+
+shared_lstm_layer = LSTM(16)
 for hdln_index in range(1, NBR_OF_HDLNS):
     padded_data_train = pad_sequences(all_train_sequences[hdln_index], maxlen=MAX_SEQUENCE_LENGTH)
     padded_data_test = pad_sequences(all_test_sequences[hdln_index], maxlen=MAX_SEQUENCE_LENGTH)
-    word_index = tokenizers[hdln_index].word_index
-    print('Found %s unique tokens.' % len(word_index))
-    print('Max index value in word_index = %s' % max(word_index.values()))
-    print('Min index value in word_index = %s' % min(word_index.values()))
-    num_words = min(MAX_NB_WORDS, len(word_index))
-    embedding_matrix = np.zeros((num_words, EMBEDDING_DIM))
-    print("Embedding Matrix dimensions = "+ str(embedding_matrix.shape[0]) + "," + str(embedding_matrix.shape[1]))
-    for word, i in word_index.items():
-        if i >= MAX_NB_WORDS:
-            continue
-        embedding_vector = embeddings_index.get(word)
-        if embedding_vector is not None:
-            # words not found in embedding index will be all-zeros.
-            embedding_matrix[i] = embedding_vector
-
-    # load pre-trained word embeddings into an Embedding layer
-    # note that we set trainable = False so as to keep the embeddings fixed
-    embedding_layer = Embedding(num_words,
-                                EMBEDDING_DIM,
-                                weights=[embedding_matrix],
-                                input_length=MAX_SEQUENCE_LENGTH,
-                                trainable=False)
 
     sequence_input = Input(shape=(MAX_SEQUENCE_LENGTH,), dtype='int32')
     embedded_sequences = embedding_layer(sequence_input)
-    lstm_layer = LSTM(8)
-    lstm_output = lstm_layer(embedded_sequences)
+    lstm_output = shared_lstm_layer(embedded_sequences)
     merged_padded_data_train.append(padded_data_train)
     merged_padded_data_test.append(padded_data_test)
     merged_lstm_output.append(lstm_output)
@@ -122,10 +125,10 @@ model.fit(merged_padded_data_train, train_labels, epochs=10)
 
 #Saving the Model to disk.
 model_json = model.to_json()
-with open("model.json", "w") as json_file:
+with open("shared.lstm.model.json", "w") as json_file:
     json_file.write(model_json)
 # serialize weights to HDF5
-model.save_weights("model.h5")
+model.save_weights("shared.lstm.model.h5")
 print("Saved model to disk")
 
 # Evaluate Model performance
