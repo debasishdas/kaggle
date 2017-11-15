@@ -8,7 +8,6 @@ import numpy as np
 from keras.preprocessing.text import text_to_word_sequence
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
-from keras.utils import to_categorical
 from keras.layers import Dense, Input, Flatten, concatenate
 from keras.layers import Conv1D, MaxPooling1D, Embedding
 from keras.models import Model
@@ -22,14 +21,14 @@ def retainAlpha(word):
             return False
     return True
 
-BASE_DIR = '/Users/debasishdas/Documents/Personal/Coursera/NeuralNet/Projects/keras/data'
+BASE_DIR = '../data'
 GLOVE_DIR = BASE_DIR + '/glove.6B/'
 TEXT_DATA_DIR = BASE_DIR + '/20_newsgroup/'
 MAX_SEQUENCE_LENGTH = 1000
 MAX_NB_WORDS = 5000
 EMBEDDING_DIM = 100
 VALIDATION_SPLIT = 0.2
-NBR_OF_HDLNS = 5
+NBR_OF_HDLNS = 15
 
 # first, build index mapping words in the embeddings set
 # to their embedding vector
@@ -47,7 +46,7 @@ f.close()
 
 print('Found %s word vectors.' % len(embeddings_index))
 
-data = pd.read_csv('Data/stocknews/Combined_News_DJIA.csv')
+data = pd.read_csv('Data/Combined_News_DJIA.csv')
 
 train = data[data['Date'] < '2015-01-01']
 test = data[data['Date'] > '2014-12-31']
@@ -105,7 +104,7 @@ for hdln_index in range(1, NBR_OF_HDLNS):
 
     sequence_input = Input(shape=(MAX_SEQUENCE_LENGTH,), dtype='int32')
     embedded_sequences = embedding_layer(sequence_input)
-    lstm_layer = LSTM(64)
+    lstm_layer = LSTM(8)
     lstm_output = lstm_layer(embedded_sequences)
     merged_padded_data_train.append(padded_data_train)
     merged_padded_data_test.append(padded_data_test)
