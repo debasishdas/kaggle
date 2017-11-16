@@ -23,9 +23,10 @@ def retainAlpha(word):
             return False
     return True
 
-BASE_DIR = '/Users/debasishdas/Documents/Personal/Coursera/NeuralNet/Projects/keras/data'
+# Download the Stanford Glove word vectors,
+# unzip and save it under <root>/data/glove.6B/
+BASE_DIR = '../data'
 GLOVE_DIR = BASE_DIR + '/glove.6B/'
-TEXT_DATA_DIR = BASE_DIR + '/20_newsgroup/'
 MAX_SEQUENCE_LENGTH = 60
 MAX_NB_WORDS = 50000
 EMBEDDING_DIM = 100
@@ -117,28 +118,37 @@ padded_q2_valid = pad_sequences(valid_q2_seq, maxlen=MAX_SEQUENCE_LENGTH)
 padded_q1_test = pad_sequences(test_q1_seq, maxlen=MAX_SEQUENCE_LENGTH)
 padded_q2_test = pad_sequences(test_q2_seq, maxlen=MAX_SEQUENCE_LENGTH)
 
-merged_padded_data_train = [padded_q1_train, padded_q2_train]
-merged_padded_data_valid = [padded_q1_valid, padded_q2_valid]
-merged_padded_data_test = [padded_q1_test, padded_q2_test]
+# Combining the padded dataset for being used as inputs to separate input layers.
+padded_data_train = [padded_q1_train, padded_q2_train]
+padded_data_valid = [padded_q1_valid, padded_q2_valid]
+padded_data_test = [padded_q1_test, padded_q2_test]
 
-# Layers
+# Separate input layers for question1 and question2
 sequence_input1 = Input(shape=(MAX_SEQUENCE_LENGTH,), dtype='int32')
 sequence_input2 = Input(shape=(MAX_SEQUENCE_LENGTH,), dtype='int32')
+
+# Combining the input layers for model definition
+seq_input = [sequence_input1, sequence_input2]
+
+# Embedding layers
 embedded_sequences1 = embedding_layer(sequence_input1)
 embedded_sequences2 = embedding_layer(sequence_input2)
 
+# Shared LSTM layer for each question
 shared_lstm_layer = LSTM(64)
 lstm_output1 = shared_lstm_layer(embedded_sequences1)
 lstm_output2 = shared_lstm_layer(embedded_sequences2)
 
+# Merging the LSTM outputs and concatenating them
+# to be fed into the final logistic layer
 merged_lstm_output = [lstm_output1, lstm_output2]
-merged_input = [sequence_input1, sequence_input2]
-
 merged_vector = concatenate(merged_lstm_output, axis=-1)
+
+# The final logistic output layer
 predictions = Dense(1, activation='sigmoid')(merged_vector)
 
 # Model definition
-model = Model(inputs=merged_input, outputs=predictions)
+model = Model(inputs=seq_input, outputs=predictions)
 
 # Compiling and training model
 model.compile(optimizer='rmsprop',
@@ -147,11 +157,11 @@ model.compile(optimizer='rmsprop',
 model.fit(merged_padded_data_train, train_labels, epochs=50)
 
 # Evaluate Model performance on validation data
-loss, acc = model.evaluate(x=merged_padded_data_valid, y=valid_labels)
+loss, acc = model.evaluate(x=padded_data_valid, y=valid_labels)
 print("Loss on validation data = %s and accuracy = %s" % (loss, acc))
 
 # Saving the predictions on validation data
-pred_labels_valid = model.predict(merged_padded_data_valid, verbose=1)
+pred_labels_valid = model.predict(padded_data_valid, verbose=1)
 pred_series_valid = pd.Series(pred_labels_valid.flat)
 valid["pred_labels"] = pred_series_valid.values
 valid.to_csv("quora-validation-results.csv")
@@ -165,7 +175,7 @@ model.save_weights("quora-shared.lstm.model.h5")
 print("Saved model to disk")
 
 # Saving the predictions on test data
-pred_labels_test = model.predict(merged_padded_data_test, verbose=1)
+pred_labels_test = model.predict(padded_data_test, verbose=1)
 pred_series_test = pd.Series(pred_labels_test.flat)
 test["is_duplicate"] = pred_series_test.values
 test.to_csv("quora-test-results.csv")

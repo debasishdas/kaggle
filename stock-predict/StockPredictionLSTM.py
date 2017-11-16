@@ -22,6 +22,8 @@ def retainAlpha(word):
             return False
     return True
 
+# Download the Stanford Glove word vectors,
+# unzip and save it under <root>/data/glove.6B/
 BASE_DIR = '../data'
 GLOVE_DIR = BASE_DIR + '/glove.6B/'
 TEXT_DATA_DIR = BASE_DIR + '/20_newsgroup/'
