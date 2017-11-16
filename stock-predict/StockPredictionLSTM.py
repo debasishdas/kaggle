@@ -65,8 +65,9 @@ for index in range(1, 26):
     test_headlines = [' '.join(text_to_word_sequence(str(headline) if type(headline) != 'str' else headline)[1:])
                       for headline in test[hdr].tolist()]
 
+
 tokenizer = Tokenizer(num_words=MAX_NB_WORDS)
-tokenizer.fit_on_texts(list(itertools.chain(*train_headlines)))
+tokenizer.fit_on_texts(train_headlines)
 
 for index in range(1, 26):
     all_train_sequences[index] = tokenizer.texts_to_sequences(train_headlines)
@@ -136,7 +137,7 @@ model.evaluate(x=merged_padded_data_test, y=test_labels)
 
 # Testing the model
 pred_labels = model.predict(merged_padded_data_test, verbose=1)
-pred_series = pd.Series(pred_labels)
+pred_series = pd.Series(pred_labels.flat)
 test["pred_labels"] = pred_series.values
 test.to_csv("test-results.csv")
 
